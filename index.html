@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>크레딧 계산기</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#111a2e; --muted:#9fb0d0; --text:#e9efff;
+      --accent:#4da3ff; --accent2:#6ee7b7; --danger:#ff6b6b; --line:#223155;
+      --input:#0f1930;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(77,163,255,.18), transparent 55%),
+                  radial-gradient(900px 700px at 80% 20%, rgba(110,231,183,.12), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:28px 18px 64px;}
+    .top{
+      display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+      margin-bottom:16px;
+    }
+    h1{margin:0; font-size:22px; letter-spacing:-0.3px;}
+    .sub{margin:6px 0 0; color:var(--muted); font-size:13px;}
+    .pill{
+      font-size:12px; color:var(--muted); border:1px solid var(--line);
+      padding:7px 10px; border-radius:999px;
+      background: rgba(255,255,255,0.03);
+      white-space:nowrap;
+    }
+    .grid{
+      display:grid; grid-template-columns: 1.2fr .8fr; gap:14px;
+    }
+    @media (max-width: 920px){ .grid{grid-template-columns: 1fr;} }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border:1px solid var(--line);
+      border-radius:14px; padding:16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.22);
+    }
+    .row{
+      display:grid; grid-template-columns: 180px 1fr; gap:10px; align-items:center;
+      margin:10px 0;
+    }
+    label{color:var(--muted); font-size:13px;}
+    select,input,textarea,button{
+      font:inherit;
+    }
+    select,input{
+      width:100%;
+      padding:10px 11px;
+      background: var(--input);
+      color:var(--text);
+      border:1px solid var(--line);
+      border-radius:10px;
+      outline:none;
+    }
+    input[type="number"]{appearance:textfield;}
+    .hint{color:var(--muted); font-size:12px; margin-top:6px;}
+    .split{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    .btn{
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      background: rgba(77,163,255,.12);
+      color:var(--text);
+      cursor:pointer;
+    }
+    .btn:hover{border-color: rgba(77,163,255,.55);}
+    .btn.secondary{background: rgba(255,255,255,.05);}
+    .btn.good{background: rgba(110,231,183,.12);}
+    .btn.danger{background: rgba(255,107,107,.12);}
+    .table{
+      width:100%;
+      border-collapse: collapse;
+      overflow:hidden;
+      border-radius:12px;
+      border:1px solid var(--line);
+    }
+    .table th,.table td{
+      padding:10px 10px;
+      border-bottom:1px solid rgba(34,49,85,.65);
+      vertical-align: middle;
+      text-align:left;
+      font-size:13px;
+    }
+    .table th{
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      font-weight:600;
+    }
+    .table tr:last-child td{border-bottom:none;}
+    .num{text-align:right;}
+    .qty{
+      width: 92px;
+      text-align:right;
+    }
+    .totals{
+      display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;
+      margin-top:12px;
+    }
+    .stat{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+      background: rgba(255,255,255,0.03);
+    }
+    .stat .k{color:var(--muted); font-size:12px;}
+    .stat .v{font-size:18px; margin-top:6px; letter-spacing:-0.2px;}
+    .stat .v.bad{color:var(--danger);}
+    textarea{
+      width:100%;
+      min-height:180px;
+      padding:11px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: var(--input);
+      color: var(--text);
+      resize: vertical;
+    }
+    .toast{
+      position: fixed; right:16px; bottom:16px;
+      background: rgba(15,25,48,.95);
+      border:1px solid var(--line);
+      padding:10px 12px; border-radius:12px;
+      color: var(--text); font-size:13px;
+      display:none;
+      box-shadow: 0 14px 36px rgba(0,0,0,.35);
+    }
+    .warn{
+      color: var(--danger);
+      font-size: 12px;
+      margin-top: 6px;
+      display:none;
+    }
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>크레딧 계산기</h1>
+      <div class="sub">구매 장비별 <span class="mono">소모품 제공금액</span>에서 초기 제공 팁 금액을 차감해 <span class="mono">제공 크레딧</span>을 계산합니다.</div>
+    </div>
+    <div class="pill" id="pill">데이터 불러오는 중…</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <label for="equip">구매 장비</label>
+        <select id="equip"></select>
+      </div>
+
+      <div class="row">
+        <label for="consumables">소모품 제공금액(원)</label>
+        <div>
+          <input id="consumables" type="number" min="0" step="1000" placeholder="예: 64900000" />
+          <div class="hint" id="consumablesFmt">-</div>
+          <div class="warn" id="warnNegative">⚠️ 초기 제공 팁 금액이 소모품 제공금액을 초과합니다. (크레딧이 음수)</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="color:var(--muted); font-size:13px;">초기 제공 팁 수량 입력</div>
+        <div class="split">
+          <button class="btn secondary" id="btnReset">수량 초기화</button>
+          <button class="btn" id="btnPrint">인쇄/PDF</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px; overflow:auto;">
+        <table class="table" id="tipsTable">
+          <thead>
+            <tr>
+              <th>팁 종류</th>
+              <th class="num">단가(원)</th>
+              <th class="num">수량</th>
+              <th class="num">금액(원)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="totals">
+        <div class="stat">
+          <div class="k">초기 제공 팁 합계</div>
+          <div class="v" id="initialTotal">0원</div>
+        </div>
+        <div class="stat">
+          <div class="k">제공 크레딧(충전)</div>
+          <div class="v" id="creditTotal">0원</div>
+        </div>
+        <div class="stat">
+          <div class="k">선택 장비</div>
+          <div class="v" id="equipLabel">-</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <div style="color:var(--muted); font-size:13px; margin-bottom:8px;">최종 요약 표</div>
+        <table class="table" id="summaryTable">
+          <thead>
+            <tr>
+              <th>구매장비</th>
+              <th class="num">소모품제공금액</th>
+              <th class="num">초기제공팁(금액)</th>
+              <th class="num">제공크레딧</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td id="sEquip">-</td>
+              <td class="num" id="sConsumables">-</td>
+              <td class="num" id="sInitial">-</td>
+              <td class="num" id="sCredit">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div>
+          <div style="font-size:15px; font-weight:600;">계약서 표기용 문구</div>
+          <div class="hint">아래 문구는 예시입니다. 실제 계약서 반영 전 법무 검토를 권장합니다.</div>
+        </div>
+        <div class="split">
+          <button class="btn good" id="btnCopy">문구 복사</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <textarea id="contractText" spellcheck="false"></textarea>
+      </div>
+      <div class="hint" style="margin-top:10px;">
+        팁별 상세 내역(수량 &gt; 0인 항목만)과 총액, 잔여 크레딧을 자동으로 포함합니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // GAS 웹앱이면 google.script.run 사용, 정적 페이지면 window.MASTER_DATA 사용
+  function loadData() {
+    const pill = document.getElementById('pill');
+    pill.textContent = '데이터 불러오는 중…';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler((data) => {
+          pill.textContent = '데이터 업데이트: ' + (data.updatedAt ? new Date(data.updatedAt).toLocaleString('ko-KR') : '알 수 없음');
+          init(data);
+        })
+        .withFailureHandler((err) => {
+          pill.textContent = '데이터 로드 실패';
+          showToast('데이터 로드 실패: ' + (err && err.message ? err.message : err), true);
+        })
+        .getMasterData();
+      return;
+    }
+
+    if (window.MASTER_DATA) {
+      pill.textContent = '정적 데이터(업데이트: ' + (window.MASTER_DATA.generatedAt || '-') + ')';
+      init(window.MASTER_DATA);
+      return;
+    }
+
+    pill.textContent = '데이터 소스 없음';
+    showToast('데이터 소스를 찾지 못했습니다. (GAS 웹앱에서 실행하거나 정적 데이터가 필요합니다)', true);
+  }
+
+  const state = {
+    data: null,
+    equipment: null,
+    consumables: 0,
+    tips: [] // {tip, unitPrice, qty}
+  };
+
+  const fmt = (n) => {
+    const v = Number(n || 0);
+    return new Intl.NumberFormat('ko-KR').format(Math.trunc(v));
+  };
+
+  const el = (id) => document.getElementById(id);
+
+  function init(data) {
+    state.data = data;
+    const select = el('equip');
+    select.innerHTML = '';
+    (data.equipments || []).forEach((e, idx) => {
+      const opt = document.createElement('option');
+      opt.value = e.name;
+      opt.textContent = e.name;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener('change', () => setEquipment(select.value));
+    el('consumables').addEventListener('input', () => {
+      state.consumables = toNum(el('consumables').value);
+      updateAll();
+    });
+
+    el('btnReset').addEventListener('click', () => {
+      state.tips.forEach(t => t.qty = 0);
+      renderTips();
+      updateAll();
+    });
+
+    el('btnCopy').addEventListener('click', async () => {
+      try{
+        await navigator.clipboard.writeText(el('contractText').value);
+        showToast('복사 완료!');
+      }catch(e){
+        // clipboard가 막혀있는 환경 대비
+        el('contractText').focus();
+        el('contractText').select();
+        showToast('클립보드 권한이 없어 텍스트를 선택했습니다. Ctrl+C로 복사하세요.');
+      }
+    });
+
+    el('btnPrint').addEventListener('click', () => window.print());
+
+    // 초기 선택
+    const first = (data.equipments && data.equipments.length) ? data.equipments[0].name : null;
+    if (first) setEquipment(first);
+    else {
+      showToast('장비 목록이 비어 있습니다. 시트 데이터를 확인하세요.', true);
+    }
+  }
+
+  function setEquipment(name) {
+    state.equipment = name;
+    const eq = (state.data.equipments || []).find(x => x.name === name);
+    state.consumables = eq ? (eq.defaultConsumables || 0) : 0;
+
+    el('equipLabel').textContent = name || '-';
+    el('consumables').value = state.consumables;
+    el('consumablesFmt').textContent = fmt(state.consumables) + '원';
+
+    // tips load
+    const raw = (state.data.tipsByEquipment && state.data.tipsByEquipment[name]) ? state.data.tipsByEquipment[name] : [];
+    state.tips = raw.map(x => ({
+      tip: x.tip,
+      unitPrice: toNum(x.unitPrice),
+      qty: toNum(x.defaultQty)
+    }));
+
+    renderTips();
+    updateAll();
+  }
+
+  function renderTips() {
+    const tbody = el('tipsTable').querySelector('tbody');
+    tbody.innerHTML = '';
+
+    state.tips.forEach((t, idx) => {
+      const tr = document.createElement('tr');
+
+      const tdTip = document.createElement('td');
+      tdTip.textContent = t.tip;
+      tr.appendChild(tdTip);
+
+      const tdUnit = document.createElement('td');
+      tdUnit.className = 'num';
+      tdUnit.textContent = fmt(t.unitPrice);
+      tr.appendChild(tdUnit);
+
+      const tdQty = document.createElement('td');
+      tdQty.className = 'num';
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.min = '0';
+      inp.step = '1';
+      inp.className = 'qty';
+      inp.value = t.qty;
+      inp.addEventListener('input', () => {
+        t.qty = toNum(inp.value);
+        updateAll();
+      });
+      tdQty.appendChild(inp);
+      tr.appendChild(tdQty);
+
+      const tdAmt = document.createElement('td');
+      tdAmt.className = 'num';
+      tdAmt.id = 'tipAmt_' + idx;
+      tdAmt.textContent = fmt(t.unitPrice * t.qty);
+      tr.appendChild(tdAmt);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function updateAll() {
+    el('consumablesFmt').textContent = fmt(state.consumables) + '원';
+
+    let initialTotal = 0;
+    state.tips.forEach((t, idx) => {
+      const amt = (t.unitPrice || 0) * (t.qty || 0);
+      initialTotal += amt;
+      const cell = document.getElementById('tipAmt_' + idx);
+      if (cell) cell.textContent = fmt(amt);
+    });
+
+    const credit = (state.consumables || 0) - initialTotal;
+
+    el('initialTotal').textContent = fmt(initialTotal) + '원';
+    el('creditTotal').textContent = fmt(credit) + '원';
+
+    const warn = el('warnNegative');
+    if (credit < 0) {
+      warn.style.display = 'block';
+      el('creditTotal').classList.add('bad');
+    } else {
+      warn.style.display = 'none';
+      el('creditTotal').classList.remove('bad');
+    }
+
+    // summary row
+    el('sEquip').textContent = state.equipment || '-';
+    el('sConsumables').textContent = fmt(state.consumables);
+    el('sInitial').textContent = fmt(initialTotal);
+    el('sCredit').textContent = fmt(credit);
+
+    // contract text
+    el('contractText').value = buildContractText_(initialTotal, credit);
+  }
+
+  function buildContractText_(initialTotal, credit) {
+    const eq = state.equipment || '(미선택)';
+    const c = state.consumables || 0;
+
+    const lines = [];
+    lines.push(`[크레딧/소모품 제공 조건]`);
+    lines.push(`1) 구매장비: ${eq}`);
+    lines.push(`2) 소모품 제공금액: ${fmt(c)}원`);
+    lines.push(`3) 초기 제공 팁(장비 납품 시 제공):`);
+
+    const selected = state.tips.filter(t => (t.qty || 0) > 0);
+    if (!selected.length) {
+      lines.push(`   - 없음`);
+    } else {
+      selected.forEach(t => {
+        const amt = (t.unitPrice || 0) * (t.qty || 0);
+        lines.push(`   - ${t.tip}: ${t.qty}개 × ${fmt(t.unitPrice)}원 = ${fmt(amt)}원`);
+      });
+    }
+
+    lines.push(`4) 초기 제공 팁 금액 합계: ${fmt(initialTotal)}원`);
+    lines.push(`5) 제공 크레딧(충전): ${fmt(credit)}원`);
+    lines.push(`   * 상기 크레딧은 계약 조건에 따라 시스템 내 크레딧 충전 방식으로 제공한다.`);
+    return lines.join('\n');
+  }
+
+  function toNum(v){
+    const n = Number(v);
+    if (!isFinite(n) || n < 0) return 0;
+    return Math.trunc(n);
+  }
+
+  let toastTimer = null;
+  function showToast(msg, isBad=false){
+    const t = el('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    t.style.borderColor = isBad ? 'rgba(255,107,107,.55)' : 'rgba(77,163,255,.55)';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.style.display = 'none', 2400);
+  }
+
+  window.MASTER_DATA = {
+  "equipments": [
+    {
+      "name": "덴서티",
+      "defaultConsumables": 64900000
+    },
+    {
+      "name": "포텐자",
+      "defaultConsumables": 4350000
+    },
+    {
+      "name": "리니어지",
+      "defaultConsumables": 19800000
+    }
+  ],
+  "tipsByEquipment": {
+    "덴서티": [
+      {
+        "tip": "A-F-600",
+        "unitPrice": 770000,
+        "defaultQty": 10
+      },
+      {
+        "tip": "H-F-600",
+        "unitPrice": 770000,
+        "defaultQty": 10
+      },
+      {
+        "tip": "C-F-600",
+        "unitPrice": 500000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "H-F-300",
+        "unitPrice": 400000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "C-F-300",
+        "unitPrice": 275000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "H-E-600",
+        "unitPrice": 600000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "C-E-500",
+        "unitPrice": 400000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "H-E-300",
+        "unitPrice": 330000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "C-E-300",
+        "unitPrice": 250000,
+        "defaultQty": 0
+      }
+    ],
+    "포텐자": [
+      {
+        "tip": "N16",
+        "unitPrice": 33000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "N25",
+        "unitPrice": 33000,
+        "defaultQty": 10
+      },
+      {
+        "tip": "N49",
+        "unitPrice": 33000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "I16",
+        "unitPrice": 33000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "I25",
+        "unitPrice": 33000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "I49",
+        "unitPrice": 33000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "CP16",
+        "unitPrice": 49000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "CP21",
+        "unitPrice": 49000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "CP25",
+        "unitPrice": 49000,
+        "defaultQty": 10
+      },
+      {
+        "tip": "1PIN-1.2",
+        "unitPrice": 11000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "1PIN-1.5",
+        "unitPrice": 11000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "1PIN-0.8",
+        "unitPrice": 11000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "SFA",
+        "unitPrice": 55000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "DDR",
+        "unitPrice": 220000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "DIA",
+        "unitPrice": 165000,
+        "defaultQty": 0
+      }
+    ],
+    "리니어지": [
+      {
+        "tip": "A카트리지",
+        "unitPrice": 3300000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "B카트리지",
+        "unitPrice": 3300000,
+        "defaultQty": 2
+      },
+      {
+        "tip": "C카트리지",
+        "unitPrice": 3300000,
+        "defaultQty": 0
+      },
+      {
+        "tip": "D카트리지",
+        "unitPrice": 3300000,
+        "defaultQty": 0
+      }
+    ]
+  },
+  "generatedAt": "2026-01-30T04:44:53"
+};
+  loadData();
+</script>
+</body>
+</html>
